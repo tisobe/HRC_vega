@@ -6,7 +6,7 @@
 #                                                                                                           #
 #           author: t. isobe (tisobe@cfa.harvard.edu)                                                       #
 #                                                                                                           #
-#           Last Update: Mar 01, 2017                                                                       #
+#           Last Update: Jun 05, 2017                                                                       #
 #                                                                                                           #
 #############################################################################################################
 
@@ -60,6 +60,8 @@ import find_coordinate          as fc
 #
 rtail  = int(time.time())
 zspace = '/tmp/zspace' + str(rtail)
+
+m_list = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
 
 #-----------------------------------------------------------------------------------------
 #-- create_html_and_plot: update vega monitoring html page                              --
@@ -320,16 +322,12 @@ def create_html_table(data):
     line = line + '<th>DeadTime Correction</th>\n'
     line = line + '</tr>\n'
 
-    for ent in data:
-        atemp = re.split('\s+', ent)
+    out  = sort_by_date(data)
+    for k in range(0, len(out[0])):
         line = line + '<tr>\n'
-        line = line + '<td style="text-align:right">'  + str(atemp[0]) + '</td>\n'
-        line = line + '<td style="text-align:center">' + str(atemp[1]) + '</td>\n'
-        line = line + '<td style="text-align:center">' + str(atemp[2]) + '</td>\n'
-        line = line + '<td style="text-align:center">' + str(atemp[3]) + '</td>\n'
-        line = line + '<td style="text-align:center">' + str(atemp[4]) + '</td>\n'
-        line = line + '<td style="text-align:center">' + str(atemp[5]) + '</td>\n'
-        line = line + '<td style="text-align:center">' + str(atemp[6]) + '</td>\n'
+        line = line + '<td style="text-align:right">'  + str(out[0][k]) + '</td>\n'
+        for m in range(1, 7):
+            line = line + '<td style="text-align:center">'  + str(out[m][k]) + '</td>\n'
         line = line + '</tr>\n'
 
     line = line + '</table>\n\n'
@@ -350,6 +348,70 @@ def read_data(infile, remove=0):
         mcf.rm_file(infile)
 
     return data
+
+#-----------------------------------------------------------------------------------------
+#-- sort_by_date: sort the data by time, assuming the second element is the time        --
+#-----------------------------------------------------------------------------------------
+
+def sort_by_date(data, tpos = 2):
+    """
+    sort the data by time, assuming the second element is the time
+    input:  data    --- a list of string data
+            tpos    --- the position of the time data
+    output: numpy array of 7 x m dimention
+        note: assume that the second element is time of the format of 2007-05-07T11:59:59
+    """
+    mdata = [[], [], [], [], [], [], []]
+    time  = []
+    for ent in data:
+        atemp = re.split('\s+', ent)
+        for k in range(0, 7):
+            mdata[k].append(atemp[k])
+        time.append(convert_time(atemp[tpos]))
+
+    mdata = numpy.array(mdata)
+    time  = numpy.array(time)
+
+    tind  = time.argsort()
+
+    for k in range(0, 7):
+        mdata[k] = mdata[k][tind[::]]
+
+    return mdata
+
+#-----------------------------------------------------------------------------------------
+#-- convert_time: convert the time format from <yyyy>-<mm>-<dd>T<hh>:<mm>:<ss> to fractional year 
+#-----------------------------------------------------------------------------------------
+
+def convert_time(stime):
+    """
+    convert the time format from <yyyy>-<mm>-<dd>T<hh>:<mm>:<ss> to fractional year
+    input:  stime   --- time in the fromat of <yyyy>-<mm>-<dd>T<hh>:<mm>:<ss>
+    output: fyear   --- time in the foramt of the fractional year
+    """
+
+    atemp = re.split('T', stime)
+    btemp = re.split('-', atemp[0])
+    ctemp = re.split(':', atemp[1])
+
+    year  = float(btemp[0])
+    mon   = int(float(btemp[1]))
+    day   = float(btemp[2])
+    yday  = day + m_list[mon-1]
+    hh    = float(ctemp[0])
+    mm    = float(ctemp[1])
+    ss    = float(ctemp[2])
+    
+    if tcnv.isLeapYear(btemp[0]):
+        base = 366.0
+        if mon > 2:
+            yday += 1
+    else:
+        base = 365.0
+
+    fyear = year + (yday + hh / 24.0 + mm / 1440.0 + ss / 86400.0) / base 
+
+    return fyear
 
 
 #-----------------------------------------------------------------------------------------
